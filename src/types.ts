@@ -61,7 +61,10 @@ export interface VocabEntry {
 
 /** Wskazówka do konkretnego błędu: jeśli odpowiedź pasuje do wyrażenia regularnego, pokaż wyjaśnienie. */
 export interface MistakeHint {
-  /** Wyrażenie regularne (bez ukośników), sprawdzane na znormalizowanej odpowiedzi (małe litery). */
+  /**
+   * Wyrażenie regularne (bez ukośników), sprawdzane na znormalizowanej odpowiedzi (małe litery, bez interpunkcji).
+   * Uwaga: \b nie działa z literami ă, â, î, ș, ț – zamiast niego używaj spacji, ^ lub $.
+   */
   match: string;
   explanation: string;
 }
@@ -75,11 +78,12 @@ interface ExerciseBase {
   mistakes?: MistakeHint[];
 }
 
-/** Przetłumacz całe zdanie. */
+/** Przetłumacz całe zdanie. Domyślnie z polskiego na język nauki; `reverse: true` – z języka nauki na polski. */
 export interface TranslateExercise extends ExerciseBase {
   type: 'translate';
   prompt: string;
   answers: string[];
+  reverse?: boolean;
 }
 
 /** Uzupełnij lukę (___) w zdaniu. */
@@ -108,7 +112,7 @@ export interface Category {
   id: string;
   title: string;
   subtitle: string;
-  /** Język, którego się uczysz, np. "en". */
+  /** Język, którego się uczysz, np. "ro" (moduły językowe: src/lib/lang). */
   language: string;
   level?: string;
   description: string;

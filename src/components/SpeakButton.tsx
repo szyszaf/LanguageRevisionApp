@@ -1,5 +1,7 @@
+import { useLang } from '../lib/langContext';
+
 /** Odczytuje tekst na głos (wbudowana synteza mowy przeglądarki). */
-export function speak(text: string, lang = 'en-GB') {
+export function speak(text: string, lang: string) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
@@ -9,9 +11,10 @@ export function speak(text: string, lang = 'en-GB') {
 }
 
 export default function SpeakButton({ text, lang }: { text: string; lang?: string }) {
+  const pack = useLang();
   if (typeof window !== 'undefined' && !('speechSynthesis' in window)) return null;
   return (
-    <button type="button" className="speak" title="Posłuchaj" aria-label={`Posłuchaj: ${text}`} onClick={() => speak(text, lang)}>
+    <button type="button" className="speak" title="Posłuchaj" aria-label={`Posłuchaj: ${text}`} onClick={() => speak(text, lang ?? pack.speech)}>
       🔊
     </button>
   );

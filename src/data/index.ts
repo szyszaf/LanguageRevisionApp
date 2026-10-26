@@ -1,8 +1,8 @@
 import type { Category, TranslateExercise } from '../types';
-import { pastSimple } from './categories/pastSimple';
+import { roPerfectCompus } from './categories/roPerfectCompus';
 
 // Tu dopisuj kolejne działy (np. z kolejnych lekcji Duolingo).
-export const categories: Category[] = [pastSimple];
+export const categories: Category[] = [roPerfectCompus];
 
 export function getCategory(id: string): Category | undefined {
   return categories.find((c) => c.id === id);

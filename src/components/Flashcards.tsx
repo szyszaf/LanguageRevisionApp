@@ -5,10 +5,12 @@ import { getStats, isDue, record } from '../lib/progress';
 import { shuffle } from '../lib/shuffle';
 import ExampleList from './ExampleList';
 import SpeakButton from './SpeakButton';
+import { useLang } from '../lib/langContext';
 
 type Direction = 'en-pl' | 'pl-en';
 
 export default function Flashcards({ category: c }: { category: Category }) {
+  const code = useLang().code.toUpperCase();
   const [onlyDue, setOnlyDue] = useState(true);
   const [dir, setDir] = useState<Direction>('en-pl');
   const [round, setRound] = useState(0);
@@ -32,8 +34,8 @@ export default function Flashcards({ category: c }: { category: Category }) {
     <div className="quiz-top">
       <a href={`#/c/${c.id}/vocab`} className="back">← {c.title}</a>
       <div className="row">
-        <button className={`chip ${dir === 'en-pl' ? 'active' : ''}`} onClick={() => setDir('en-pl')}>EN → PL</button>
-        <button className={`chip ${dir === 'pl-en' ? 'active' : ''}`} onClick={() => setDir('pl-en')}>PL → EN</button>
+        <button className={`chip ${dir === 'en-pl' ? 'active' : ''}`} onClick={() => setDir('en-pl')}>{code} → PL</button>
+        <button className={`chip ${dir === 'pl-en' ? 'active' : ''}`} onClick={() => setDir('pl-en')}>PL → {code}</button>
       </div>
       <span className="small">{Math.min(pos + 1, deck.length)} / {deck.length}</span>
     </div>

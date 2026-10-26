@@ -1,69 +1,90 @@
 import { describe, expect, it } from 'vitest';
-import { isCorrect, normalize } from './answer';
+import { isCorrect, matchIgnoringDiacritics, normalize } from './answer';
 import { detectMistakes } from './detectors';
-import { pastSimple } from '../data/categories/pastSimple';
+import { categories } from '../data';
 
-const titles = (u: string, e: string) => detectMistakes(u, e).map((d) => d.title);
+const titles = (u: string, e: string, lang = 'ro') => detectMistakes(u, e, lang).map((d) => d.title);
 
-describe('normalize / isCorrect', () => {
-  it('ignores case, punctuation and contractions', () => {
-    expect(normalize("I DIDN'T go!")).toBe('i did not go');
-    expect(isCorrect('we did not go to school yesterday', ["We didn't go to school yesterday."])).toBe(true);
-    expect(isCorrect('I bought a new phone', ['I bought a new phone.'])).toBe(true);
+describe('rumuński – normalizacja', () => {
+  it('n-am = nu am, ş/ţ z ogonkiem = ș/ț z przecinkiem', () => {
+    expect(normalize('N-am mâncat!', 'ro')).toBe('nu am mâncat');
+    expect(isCorrect('N-am mâncat micul dejun', ['Nu am mâncat micul dejun.'], 'ro')).toBe(true);
+    expect(isCorrect('Am fost acasă', ['Am fost acasă.'], 'ro')).toBe(true);
+    expect(isCorrect('M-am trezit la ora şapte', ['M-am trezit la ora șapte.'], 'ro')).toBe(true);
+  });
+  it('odpowiedź bez znaków diakrytycznych jest rozpoznawana', () => {
+    expect(isCorrect('Ce ai facut ieri', ['Ce ai făcut ieri?'], 'ro')).toBe(false);
+    expect(matchIgnoringDiacritics('Ce ai facut ieri', ['Ce ai făcut ieri?'], 'ro')).toBe('Ce ai făcut ieri?');
   });
 });
 
-describe('detectMistakes', () => {
-  it('regularized irregular verb', () => {
-    expect(titles('I goed home', 'I went home')[0]).toContain('nieregularny');
+describe('rumuński – wykrywanie błędów', () => {
+  it('zły posiłkowy', () => {
+    expect(titles('Ei a venit', 'Ei au venit')).toContain('Zła forma czasownika posiłkowego');
   });
-  it('past form after did', () => {
-    expect(titles("I didn't went there", "I didn't go there")).toContain('Po „did” forma podstawowa');
+  it('pełna forma „are”', () => {
+    expect(titles('El are scris', 'El a scris')).toContain('Pełna forma „a avea” zamiast posiłkowej');
   });
-  it('base form instead of past', () => {
-    expect(titles('I go home yesterday', 'I went home yesterday')).toContain('Brak formy przeszłej');
+  it('brak posiłkowego', () => {
+    expect(titles('Ieri mâncat pizza', 'Ieri am mâncat pizza')).toContain('Brakuje czasownika posiłkowego');
   });
-  it('was / were', () => {
-    expect(titles('You was late', 'You were late')).toContain('Was czy were?');
+  it('imiesłów „z reguły” zamiast nieregularnego', () => {
+    expect(titles('Am vedut un film', 'Am văzut un film')[0]).toContain('Nieregularny imiesłów');
+    expect(titles('Noi am mergut', 'Noi am mers')[0]).toContain('Nieregularny imiesłów');
   });
-  it('present perfect with past time expression', () => {
-    expect(titles('I have met him two years ago', 'I met him two years ago')).toContain('Present Perfect zamiast Past Simple');
+  it('bezokolicznik / czas teraźniejszy zamiast imiesłowu', () => {
+    expect(titles('Am mânca pizza', 'Am mâncat pizza')).toContain('Bezokolicznik zamiast imiesłowu');
+    expect(titles('Am merg la Cluj', 'Am mers la Cluj')).toContain('Czas teraźniejszy zamiast imiesłowu');
   });
-  it('typo', () => {
-    expect(titles('I bougt a new phone', 'I bought a new phone')).toContain('Literówka');
+  it('odmiana imiesłowu przez rodzaj', () => {
+    expect(titles('Am mâncată', 'Am mâncat')).toContain('Imiesłów się nie odmienia');
   });
-  it('missing did in question', () => {
-    expect(titles('Where you went', 'Where did you go')).toContain('Brakuje „did”');
+  it('brak zaimka zwrotnego', () => {
+    expect(titles('Am trezit la ora șapte', 'M-am trezit la ora șapte')).toContain('Brakuje zaimka przed posiłkowym');
   });
-  it('did with be', () => {
-    expect(titles('Where did you were last night', 'Where were you last night')).toContain('Z „be” nie używamy „did”');
+  it('rozdzielony zaimek i „o” przed posiłkowym', () => {
+    expect(titles('Mă am trezit', 'M-am trezit')).toEqual(['Brakuje łącznika']);
+    expect(titles('Am vazut o ieri', 'Am văzut-o ieri')).toContain('Brakuje łącznika');
+    expect(titles('O am văzut ieri', 'Am văzut-o ieri')).toContain('Zaimek „o” stoi po imiesłowie');
+    expect(titles('O am văzut ieri', 'Am văzut-o ieri')).not.toContain('Literówka');
   });
-  it('word order', () => {
-    expect(titles('I yesterday went home', 'I went home yesterday')).toContain('Szyk zdania');
+  it('przeczenie po posiłkowym', () => {
+    expect(titles('Am nu mâncat', 'Nu am mâncat')).toContain('Przeczenie przed posiłkowym');
+  });
+  it('słowa bez diakrytyków nie rozbijają porównania', () => {
+    expect(titles('Ei a ajuns saptamana trecuta', 'Ei au ajuns săptămâna trecută')).toEqual(['Zła forma czasownika posiłkowego', 'Znaki diakrytyczne']);
+  });
+  it('zaimek zamiast posiłkowego', () => {
+    expect(titles('Ieri eu fost acasă', 'Ieri am fost acasă')).toEqual(['Brakuje czasownika posiłkowego']);
+  });
+  it('same znaki diakrytyczne w jednym słowie', () => {
+    expect(titles('Am facut tema ieri', 'Am făcut tema azi')).toContain('Znaki diakrytyczne');
   });
 });
 
-describe('past simple data', () => {
-  it('has unique ids and valid references', () => {
-    const ids = pastSimple.exercises.map((e) => e.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    const topics = new Set(pastSimple.grammar.map((g) => g.id));
-    for (const e of pastSimple.exercises) if (e.grammarRef) expect(topics.has(e.grammarRef)).toBe(true);
-    for (const e of pastSimple.exercises) if (e.type === 'gap') expect(e.sentence).toContain('___');
-    for (const e of pastSimple.exercises) for (const m of e.mistakes ?? []) expect(() => new RegExp(m.match)).not.toThrow();
+describe('angielski – moduł nadal działa', () => {
+  it('goed / didn\'t went / was-were', () => {
+    expect(titles('I goed home', 'I went home', 'en')[0]).toContain('nieregularny');
+    expect(titles("I didn't went there", "I didn't go there", 'en')).toContain('Po „did” forma podstawowa');
+    expect(titles('You was late', 'You were late', 'en')).toContain('Was czy were?');
+    expect(isCorrect('we didnt go', ["We didn't go."], 'en')).toBe(true);
   });
 });
 
-describe('more cases', () => {
-  it('contractions without apostrophe', () => {
-    expect(isCorrect('we didnt go to school yesterday', ["We didn't go to school yesterday."])).toBe(true);
-  });
-  it('present -s form instead of past', () => {
-    expect(titles('Yesterday she goes home', 'Yesterday she went home')).toContain('Czas teraźniejszy zamiast przeszłego');
-  });
-  it('moved words are reported as word order, not missing/extra', () => {
-    const t = titles('Where did you were last night', 'Where were you last night');
-    expect(t).toContain('Szyk zdania');
-    expect(t).not.toContain('Zbędne słowa');
-  });
+describe('dane działów', () => {
+  for (const c of categories) {
+    it(`${c.id}: unikalne id, poprawne odwołania, działające wyrażenia`, () => {
+      const ids = c.exercises.map((e) => e.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      const vIds = c.vocabulary.map((v) => v.id);
+      expect(new Set(vIds).size).toBe(vIds.length);
+      const topics = new Set(c.grammar.map((g) => g.id));
+      for (const e of c.exercises) {
+        if (e.grammarRef) expect(topics.has(e.grammarRef), `${e.id} → ${e.grammarRef}`).toBe(true);
+        if (e.type === 'gap') expect(e.sentence).toContain('___');
+        if (e.type === 'choice') expect(e.options[e.correct]).toBeDefined();
+        for (const m of e.mistakes ?? []) expect(() => new RegExp(m.match, 'iu')).not.toThrow();
+      }
+    });
+  }
 });

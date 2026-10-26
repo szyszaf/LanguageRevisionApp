@@ -1,12 +1,13 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import type { Category, Exercise } from '../types';
 import { exKey, vocabExercises } from '../data';
-import { closestAnswer, diffWords, isCorrect, tokenize, type DiffOp } from '../lib/answer';
+import { closestAnswer, diffWords, isCorrect, matchIgnoringDiacritics, tokenize, type DiffOp } from '../lib/answer';
 import { detectMistakes, type Diagnosis } from '../lib/detectors';
 import { record, wasWrong } from '../lib/progress';
 import { shuffle } from '../lib/shuffle';
 import { speak } from './SpeakButton';
 import GrammarTopicView from './GrammarTopicView';
+import { useLang } from '../lib/langContext';
 
 export type QuizMode = 'grammar' | 'words' | 'mixed' | 'mistakes';
 
@@ -23,6 +24,8 @@ interface Result {
   expected: string;
   diff?: DiffOp[];
   diagnoses: Diagnosis[];
+  /** Uwaga przy odpowiedzi zaliczonej, np. brak znaków diakrytycznych. */
+  note?: string;
 }
 
 function buildQueue(c: Category, mode: QuizMode): Exercise[] {
@@ -35,14 +38,30 @@ function buildQueue(c: Category, mode: QuizMode): Exercise[] {
   return shuffle(list);
 }
 
-function evaluate(ex: Exercise, input: string): Result {
+/** Język odpowiedzi: tłumaczenie „reverse” odpowiada się po polsku. */
+const answerLang = (ex: Exercise, lang: string) => (ex.type === 'translate' && ex.reverse ? 'pl' : lang);
+
+function evaluate(ex: Exercise, input: string, categoryLang: string): Result {
   if (ex.type === 'choice') {
     const chosen = Number(input);
     return { correct: chosen === ex.correct, user: ex.options[chosen], expected: ex.options[ex.correct], diagnoses: [] };
   }
-  const correct = isCorrect(input, ex.answers);
-  const expected = closestAnswer(input, ex.answers);
+  const lang = answerLang(ex, categoryLang);
+  const correct = isCorrect(input, ex.answers, lang);
+  const expected = closestAnswer(input, ex.answers, lang);
   if (correct) return { correct, user: input, expected, diagnoses: [] };
+
+  // Zaliczamy odpowiedź bez znaków diakrytycznych (jak Duolingo), ale pokazujemy poprawną pisownię.
+  const nearly = matchIgnoringDiacritics(input, ex.answers, lang);
+  if (nearly) {
+    return {
+      correct: true,
+      user: input,
+      expected: nearly,
+      diagnoses: [],
+      note: `Zaliczone, ale uważaj na znaki diakrytyczne. Poprawna pisownia: „${nearly}”.`,
+    };
+  }
 
   // Przy lukach analizujemy całe zdanie, żeby wykrywacze widziały kontekst (np. "did" przed luką).
   const fullUser = ex.type === 'gap' ? ex.sentence.replace('___', input) : input;
@@ -51,8 +70,8 @@ function evaluate(ex: Exercise, input: string): Result {
     correct,
     user: input,
     expected,
-    diff: diffWords(tokenize(fullUser), tokenize(fullExpected)),
-    diagnoses: detectMistakes(fullUser, fullExpected, ex.mistakes),
+    diff: diffWords(tokenize(fullUser, lang), tokenize(fullExpected, lang)),
+    diagnoses: detectMistakes(fullUser, fullExpected, lang, ex.mistakes),
   };
 }
 
@@ -65,6 +84,7 @@ export default function Quiz({ category: c, mode }: { category: Category; mode: 
   const [score, setScore] = useState({ ok: 0, bad: 0 });
   const [requeued, setRequeued] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
+  const pack = useLang();
 
   if (initial.length === 0) {
     return (
@@ -110,7 +130,7 @@ export default function Quiz({ category: c, mode }: { category: Category; mode: 
 
   const check = (value: string) => {
     if (result || value.trim() === '') return;
-    const r = evaluate(ex, value);
+    const r = evaluate(ex, value, c.language);
     setResult(r);
     if (!isRetry) {
       record(exKey(c.id, ex.id), r.correct);
@@ -120,7 +140,20 @@ export default function Quiz({ category: c, mode }: { category: Category; mode: 
       setQueue((q) => [...q, ex]);
       setRequeued((s) => new Set(s).add(ex.id));
     }
-    if (r.correct && ex.type !== 'choice') speak(ex.type === 'gap' ? ex.sentence.replace('___', r.expected) : r.expected);
+    if (r.correct && ex.type !== 'choice' && answerLang(ex, c.language) === c.language)
+      speak(ex.type === 'gap' ? ex.sentence.replace('___', r.expected) : r.expected, pack.speech);
+  };
+
+  /** Wstawia znak w miejscu kursora (przyciski z literami rumuńskimi). */
+  const insertChar = (ch: string) => {
+    const el = inputRef.current;
+    const start = el?.selectionStart ?? input.length;
+    const end = el?.selectionEnd ?? input.length;
+    setInput(input.slice(0, start) + ch + input.slice(end));
+    setTimeout(() => {
+      el?.focus();
+      el?.setSelectionRange(start + ch.length, start + ch.length);
+    }, 0);
   };
 
   const next = () => {
@@ -147,7 +180,7 @@ export default function Quiz({ category: c, mode }: { category: Category; mode: 
 
       <form className="card question" onSubmit={onSubmit}>
         {isRetry && <span className="pill warn">Poprawka</span>}
-        <QuestionBody ex={ex} />
+        <QuestionBody ex={ex} targetName={pack.nameTo} />
 
         {ex.type === 'choice' ? (
           <div className="options">
@@ -183,6 +216,15 @@ export default function Quiz({ category: c, mode }: { category: Category; mode: 
             spellCheck={false}
           />
         )}
+        {ex.type !== 'choice' && !result && answerLang(ex, c.language) === 'ro' && (
+          <div className="charbar" aria-label="Znaki rumuńskie">
+            {['ă', 'â', 'î', 'ș', 'ț'].map((ch) => (
+              <button type="button" key={ch} className="chip" tabIndex={-1} onMouseDown={(e) => e.preventDefault()} onClick={() => insertChar(ch)}>
+                {ch}
+              </button>
+            ))}
+          </div>
+        )}
 
         {result && <Feedback ex={ex} result={result} category={c} />}
 
@@ -202,11 +244,11 @@ export default function Quiz({ category: c, mode }: { category: Category; mode: 
   );
 }
 
-function QuestionBody({ ex }: { ex: Exercise }) {
+function QuestionBody({ ex, targetName }: { ex: Exercise; targetName: string }) {
   if (ex.type === 'translate')
     return (
       <>
-        <p className="q-label">Przetłumacz na angielski</p>
+        <p className="q-label">Przetłumacz na {ex.reverse ? 'polski' : targetName}</p>
         <p className="q-main">{ex.prompt}</p>
       </>
     );
@@ -236,6 +278,7 @@ function Feedback({ ex, result: r, category }: { ex: Exercise; result: Result; c
   return (
     <div className={`feedback ${r.correct ? 'ok' : 'bad'}`}>
       <h3>{r.correct ? '✓ Dobrze!' : '✗ Niestety, źle'}</h3>
+      {r.note && <p className="note-warn">⚠️ {r.note}</p>}
 
       {!r.correct && ex.type !== 'choice' && (
         <>

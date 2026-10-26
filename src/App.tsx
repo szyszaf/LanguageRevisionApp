@@ -4,6 +4,8 @@ import Home from './components/Home';
 import CategoryPage from './components/CategoryPage';
 import Quiz, { type QuizMode } from './components/Quiz';
 import Flashcards from './components/Flashcards';
+import { LangContext } from './lib/langContext';
+import { getPack } from './lib/lang';
 
 export default function App() {
   const [page, catId, sub, extra] = useRoute();
@@ -22,7 +24,9 @@ export default function App() {
           <span className="brand-mark">Aa</span> Powtórki
         </a>
       </header>
-      <main className="container">{content}</main>
+      <LangContext.Provider value={getPack(cat?.language ?? 'ro')}>
+        <main className="container">{content}</main>
+      </LangContext.Provider>
     </div>
   );
 }

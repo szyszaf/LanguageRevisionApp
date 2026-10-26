@@ -252,6 +252,9 @@ tbody tr:hover { background: var(--surface-2); }
 .diagnosis { margin-bottom: 8px; }
 .diagnosis p { margin: 2px 0 0; }
 .explanation p { margin-bottom: 6px; }
+.charbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.charbar .chip { min-width: 2.4em; font-size: 1rem; }
+.note-warn { background: var(--warn-soft); border-radius: 8px; padding: 6px 10px; }
 .opt-expl { padding-left: 1.2em; margin: 6px 0; }
 .feedback .topic { margin-top: 10px; }
 
