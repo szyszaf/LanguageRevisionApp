@@ -99,6 +99,7 @@ function VocabTab({ c }: { c: Category }) {
 
 function PracticeTab({ c }: { c: Category }) {
   const [, force] = useState(0);
+  const [confirming, setConfirming] = useState(false);
   const exIds = c.exercises.map((e) => exKey(c.id, e.id));
   const wIds = vocabExercises(c).map((e) => exKey(c.id, e.id));
   const wrongCount = [...exIds, ...wIds].filter(wasWrong).length;
@@ -132,17 +133,26 @@ function PracticeTab({ c }: { c: Category }) {
           <p className="muted small">{dueWords} słówek do powtórki dziś (system Leitnera)</p>
         </a>
       </div>
-      <button
-        className="link danger small"
-        onClick={() => {
-          if (confirm('Usunąć cały postęp w tym dziale?')) {
-            resetProgress(`${c.id}:`);
-            force((n) => n + 1);
-          }
-        }}
-      >
-        Wyzeruj postęp w tym dziale
-      </button>
+      {confirming ? (
+        <div className="row small">
+          <span>Usunąć cały postęp w tym dziale?</span>
+          <button
+            className="link danger"
+            onClick={() => {
+              resetProgress(`${c.id}:`);
+              setConfirming(false);
+              force((n) => n + 1);
+            }}
+          >
+            Tak, usuń
+          </button>
+          <button className="link" onClick={() => setConfirming(false)}>Anuluj</button>
+        </div>
+      ) : (
+        <button className="link danger small" onClick={() => setConfirming(true)}>
+          Wyzeruj postęp w tym dziale
+        </button>
+      )}
     </>
   );
 }

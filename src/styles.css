@@ -73,9 +73,14 @@ p { margin: 0 0 0.8em; }
 .center { text-align: center; }
 
 .topbar {
-  position: sticky; top: 0; z-index: 10;
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
   background: var(--surface); border-bottom: 1px solid var(--border);
-  padding: 10px 16px;
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+body::before {
+  content: ''; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface);
 }
 .brand { font-weight: 700; color: var(--text); display: inline-flex; align-items: center; gap: 8px; }
 .brand:hover { text-decoration: none; }
@@ -83,7 +88,11 @@ p { margin: 0 0 0.8em; }
   background: var(--accent); color: #fff; border-radius: 8px;
   width: 30px; height: 30px; display: inline-grid; place-items: center; font-size: 0.85rem;
 }
-.container { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+.container {
+  max-width: 980px; margin: 0 auto; padding-block: 24px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
 
 .hero { margin-bottom: 20px; }
 .card {
@@ -177,6 +186,8 @@ tbody tr:hover { background: var(--surface-2); }
   border: 2px solid var(--border); border-radius: 10px; padding: 10px 14px; width: 100%;
 }
 .input:focus { outline: none; border-color: var(--accent); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 .input.right { border-color: var(--accent); background: var(--accent-soft); }
 .input.wrong { border-color: var(--danger); background: var(--danger-soft); }
 .big-input { font-size: 1.15rem; margin: 10px 0; }
